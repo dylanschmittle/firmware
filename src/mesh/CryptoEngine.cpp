@@ -1,6 +1,10 @@
 #include "CryptoEngine.h"
 // #include "NodeDB.h"
 #include "architecture.h"
+#include "KyberConfig.h"
+#ifdef USE_KYBER_CRYPTO
+#include "KyberCryptoEngine.h"
+#endif
 
 #if !(MESHTASTIC_EXCLUDE_PKI)
 #include "NodeDB.h"
@@ -267,5 +271,9 @@ void CryptoEngine::initNonce(uint32_t fromNode, uint64_t packetId, uint32_t extr
         memcpy(nonce + sizeof(uint32_t), &extraNonce, sizeof(uint32_t));
 }
 #ifndef HAS_CUSTOM_CRYPTO_ENGINE
+#ifdef USE_KYBER_CRYPTO
+CryptoEngine *crypto = new KyberCryptoEngine;
+#else
 CryptoEngine *crypto = new CryptoEngine;
+#endif
 #endif
