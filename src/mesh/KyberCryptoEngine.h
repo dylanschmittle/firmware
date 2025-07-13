@@ -1,5 +1,6 @@
 #pragma once
 #include "CryptoEngine.h"
+#include "kyber/common/params.h"
 #include "kyber/kem/kem.h"
 #include "kyber/fips202/fips202.h"
 
