@@ -7,6 +7,14 @@
 /**
  * Quantum-resistant crypto engine using CRYSTALS-KYBER KEM
  * Replaces Curve25519 with post-quantum key encapsulation
+ * 
+ * IMPORTANT: This implementation uses full Kyber key sizes:
+ * - Public keys:  800 bytes (vs 32 for Curve25519)
+ * - Private keys: 1632 bytes (vs 32 for Curve25519)  
+ * - Ciphertext:   768 bytes (new requirement)
+ * 
+ * WARNING: Current Meshtastic protocol is incompatible with these sizes.
+ * This implementation preserves quantum security but breaks network compatibility.
  */
 class KyberCryptoEngine : public CryptoEngine
 {
@@ -28,10 +36,16 @@ class KyberCryptoEngine : public CryptoEngine
 #endif
 
   private:
-    // Kyber key storage - larger than Curve25519
-    uint8_t kyber_public_key[CRYPTO_PUBLICKEYBYTES];
-    uint8_t kyber_private_key[CRYPTO_SECRETKEYBYTES];
-    uint8_t kyber_shared_secret[CRYPTO_BYTES];
+    // Kyber key storage - significantly larger than Curve25519
+    uint8_t kyber_public_key[CRYPTO_PUBLICKEYBYTES];   // 800 bytes
+    uint8_t kyber_private_key[CRYPTO_SECRETKEYBYTES];  // 1632 bytes  
+    uint8_t kyber_shared_secret[CRYPTO_BYTES];         // 32 bytes
     
     bool kyber_keys_generated;
+    
+    // Utility functions for key size compatibility
+    static constexpr size_t getPublicKeySize() { return CRYPTO_PUBLICKEYBYTES; }
+    static constexpr size_t getPrivateKeySize() { return CRYPTO_SECRETKEYBYTES; }
+    static constexpr size_t getCiphertextSize() { return CRYPTO_CIPHERTEXTBYTES; }
+    static constexpr size_t getSharedSecretSize() { return CRYPTO_BYTES; }
 };

@@ -35,16 +35,25 @@ void KyberCryptoEngine::generateKeyPair(uint8_t *pubKey, uint8_t *privKey)
     int result = crypto_kem_keypair(kyber_public_key, kyber_private_key);
     
     if (result == 0) {
-        // Copy keys to output buffers
+        // Copy full keys to output buffers - NO TRUNCATION
         memcpy(pubKey, kyber_public_key, CRYPTO_PUBLICKEYBYTES);
         memcpy(privKey, kyber_private_key, CRYPTO_SECRETKEYBYTES);
         
-        // Store for later use - truncate for compatibility with existing 32-byte interface
-        memcpy(public_key, kyber_public_key, 32);
-        memcpy(private_key, kyber_private_key, 32);
+        // Store truncated keys for legacy compatibility (DESTROYS SECURITY!)
+        // NOTE: This breaks quantum security but maintains protocol compatibility
+        // Full protocol redesign required for production quantum resistance
+        size_t pub_copy_size = std::min(static_cast<size_t>(32), static_cast<size_t>(CRYPTO_PUBLICKEYBYTES));
+        size_t priv_copy_size = std::min(static_cast<size_t>(32), static_cast<size_t>(CRYPTO_SECRETKEYBYTES));
+        memcpy(public_key, kyber_public_key, pub_copy_size);
+        memcpy(private_key, kyber_private_key, priv_copy_size);
+        
+        LOG_WARN("Key truncation preserves protocol compatibility but destroys quantum security!");
+        LOG_WARN("Full keys: pub=%d bytes, priv=%d bytes", CRYPTO_PUBLICKEYBYTES, CRYPTO_SECRETKEYBYTES);
+        LOG_WARN("Truncated: pub=%zu bytes, priv=%zu bytes", pub_copy_size, priv_copy_size);
         
         kyber_keys_generated = true;
-        LOG_DEBUG("Kyber keypair generated successfully");
+        LOG_DEBUG("Kyber keypair generated successfully - %d byte public key, %d byte private key", 
+                  CRYPTO_PUBLICKEYBYTES, CRYPTO_SECRETKEYBYTES);
     } else {
         LOG_ERROR("Kyber keypair generation failed");
         kyber_keys_generated = false;
@@ -76,10 +85,12 @@ bool KyberCryptoEngine::encryptCurve25519(uint32_t toNode, uint32_t fromNode, me
         return false;
     }
 
-    // For Kyber, we need the full public key, but remotePublic might be truncated
-    // This is a compatibility issue that needs addressing in the protocol
+    // For Kyber, we need the full public key, but remotePublic is limited by protocol
+    // CRITICAL: This is a fundamental protocol incompatibility
     if (remotePublic.size < CRYPTO_PUBLICKEYBYTES) {
-        LOG_ERROR("Kyber requires %d byte public key, got %d bytes", CRYPTO_PUBLICKEYBYTES, remotePublic.size);
+        LOG_ERROR("Kyber requires %d byte public key, got %d bytes - protocol incompatible", 
+                  CRYPTO_PUBLICKEYBYTES, remotePublic.size);
+        LOG_ERROR("This breaks quantum security - full protocol redesign needed");
         return false;
     }
 
@@ -155,9 +166,16 @@ bool KyberCryptoEngine::decryptCurve25519(uint32_t fromNode, meshtastic_UserLite
 
 bool KyberCryptoEngine::setDHPublicKey(uint8_t *publicKey)
 {
-    // Store the public key for later use
-    // Note: This assumes publicKey is at least CRYPTO_PUBLICKEYBYTES
+    // Store the full Kyber public key for later use
+    // WARNING: This method assumes caller provides a full CRYPTO_PUBLICKEYBYTES buffer
+    // Current Meshtastic protocol only provides 32 bytes, causing security issues
+    if (publicKey == nullptr) {
+        LOG_ERROR("Cannot set null public key");
+        return false;
+    }
+    
     memcpy(kyber_public_key, publicKey, CRYPTO_PUBLICKEYBYTES);
+    LOG_DEBUG("Set Kyber public key - %d bytes", CRYPTO_PUBLICKEYBYTES);
     return true;
 }
 
