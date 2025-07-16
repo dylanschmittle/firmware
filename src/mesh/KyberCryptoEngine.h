@@ -3,6 +3,7 @@
 #include "kyber/common/params.h"
 #include "kyber/kem/kem.h"
 #include "kyber/fips202/fips202.h"
+#include "kyber_protocol.h"
 
 /**
  * Quantum-resistant crypto engine using CRYSTALS-KYBER KEM
@@ -33,6 +34,12 @@ class KyberCryptoEngine : public CryptoEngine
                                    size_t numBytes, const uint8_t *bytes, uint8_t *bytesOut) override;
     virtual bool setDHPublicKey(uint8_t *publicKey) override;
     virtual void hash(uint8_t *bytes, size_t numBytes) override;
+    
+    // Kyber-specific protocol methods
+    bool initiateKyberKeyExchange(uint32_t toNode);
+    bool handleKyberProtocolMessage(const kyber_protocol_message_t* msg, uint32_t fromNode);
+    bool sendKyberPublicKey(uint32_t toNode);
+    bool processKyberCiphertext(const uint8_t* ciphertext, uint32_t fromNode);
 #endif
 
   private:
@@ -42,6 +49,15 @@ class KyberCryptoEngine : public CryptoEngine
     uint8_t kyber_shared_secret[CRYPTO_BYTES];         // 32 bytes
     
     bool kyber_keys_generated;
+    
+    // Session management for multi-part key exchange
+    kyber_session_context_t* active_sessions[KYBER_MAX_CONCURRENT_SESSIONS];
+    uint8_t session_count;
+    
+    // Internal protocol methods
+    kyber_session_context_t* findOrCreateSession(uint32_t peer_node);
+    void cleanupExpiredSessions();
+    bool sendKyberMessage(const kyber_protocol_message_t* msg, uint32_t toNode);
     
     // Utility functions for key size compatibility
     static constexpr size_t getPublicKeySize() { return CRYPTO_PUBLICKEYBYTES; }
